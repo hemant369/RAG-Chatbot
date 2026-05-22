@@ -1,0 +1,23 @@
+# Virtual ENvironment
+venv/
+
+# Python Cache  
+__pycache__/
+*.pyc
+
+# ChromaDB
+chroma_db/  
+db/
+chromadb/
+
+#.env
+.env    
+
+#Streamlit
+.streamlit/
+
+#VSCode
+.vscode/    
+
+#Windows
+Thumbs.db
