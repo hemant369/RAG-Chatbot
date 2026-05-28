@@ -42,34 +42,75 @@ def get_query_engine(
         embed_model=embed_model,
     )
 
-    if category:
+    try:
 
-        filters = MetadataFilters(
-            filters=[
-                ExactMatchFilter(
-                    key="category",
-                    value=category
+        if category:
+
+            filters = MetadataFilters(
+                filters=[
+                    ExactMatchFilter(
+                        key="category",
+                        value=category
+                    )
+                ]
+            )
+
+            retriever = index.as_retriever(
+                similarity_top_k=top_k,
+                filters=filters
+            )
+
+            nodes = retriever.retrieve(
+                "test"
+            )
+
+            # No matching category
+            if len(nodes) == 0:
+
+                print(
+                    "No filtered nodes found. "
+                    "Using global search."
                 )
-            ]
-        )
 
-        query_engine = index.as_query_engine(
+                query_engine = index.as_query_engine(
+                    llm=llm,
+                    similarity_top_k=top_k,
+                    node_postprocessors=[
+                        reranker
+                    ]
+                )
+
+            else:
+
+                query_engine = index.as_query_engine(
+                    llm=llm,
+                    similarity_top_k=top_k,
+                    filters=filters,
+                    node_postprocessors=[
+                        reranker
+                    ]
+                )
+
+        else:
+
+            query_engine = index.as_query_engine(
+                llm=llm,
+                similarity_top_k=top_k,
+                node_postprocessors=[
+                    reranker
+                ]
+            )
+
+        return query_engine
+
+    except Exception as e:
+
+        print(f"Query Engine Error: {e}")
+
+        return index.as_query_engine(
             llm=llm,
             similarity_top_k=top_k,
-            filters=filters,
             node_postprocessors=[
                 reranker
             ]
         )
-
-    else:
-
-        query_engine = index.as_query_engine(
-            llm=llm,
-            similarity_top_k=top_k,
-            node_postprocessors=[
-                reranker
-            ]
-        )
-
-    return query_engine

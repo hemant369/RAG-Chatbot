@@ -139,6 +139,11 @@ if query:
 
         response = query_engine.query(query)
 
+        if not response.response:
+            st.warning("No relevant documents found.")
+        else:
+            st.write(response.response)
+
         response_time = round(
             time.time() - start_time,
             2
