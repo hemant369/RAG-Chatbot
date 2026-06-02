@@ -5,9 +5,9 @@ from utils.document_loader import (
     load_uploaded_document,
 )
 
-from utils.category_detector import (
-    detect_category,
-    detect_query_category,
+from utils.document_manager import (
+    generate_file_hash,
+    document_exists,
 )
 
 from utils.query_engine import (
@@ -28,6 +28,7 @@ st.set_page_config(
 st.title("📄 Advanced Local RAG App")
 
 
+
 # ============================================
 # SIDEBAR
 # ============================================
@@ -45,8 +46,8 @@ top_k = st.sidebar.slider(
 # FILE UPLOAD
 # ============================================
 
-uploaded_file = st.file_uploader(
-    "Upload Document",
+uploaded_files = st.file_uploader(
+    "Upload Documents",
     type=[
         "pdf",
         "txt",
@@ -55,7 +56,8 @@ uploaded_file = st.file_uploader(
         "json",
         "yaml",
         "yml"
-    ]
+    ],
+    accept_multiple_files=True
 )
 
 
@@ -63,7 +65,7 @@ uploaded_file = st.file_uploader(
 # DOCUMENT INDEXING
 # ============================================
 
-if uploaded_file and st.button(
+if uploaded_files and st.button(
     "Load Document"
 ):
 
@@ -71,36 +73,46 @@ if uploaded_file and st.button(
         "Indexing document..."
     ):
 
-        documents = load_uploaded_document(
-            uploaded_file
-        )
+        try:
 
-        full_text = " ".join(
-            [doc.text for doc in documents]
-        )
+            for uploaded_file in uploaded_files:
 
-        detected_category = detect_category(
-            full_text
-        )
+                # Load documents
+                documents = load_uploaded_document(
+                    uploaded_file
+                )
 
-        st.success(
-            f"Detected Category: "
-            f"{detected_category}"
-        )
+                # Generate document hash
+                file_hash = generate_file_hash(
+                    uploaded_file
+                )
 
-        for doc in documents:
+                # Check if already indexed
+                if document_exists(file_hash):
+                    st.warning(
+                        f"{uploaded_file.name} already indexed."
+                        )
 
-            doc.metadata = {
-                "file_name": uploaded_file.name,
-                "category": detected_category,
-            }
+                    continue
 
-        create_index(documents)
+                for doc in documents:
 
-        st.success(
-            "Document Indexed Successfully!"
-        )
+                    doc.metadata = {
+                        "file_name": uploaded_file.name,
+                        "file_hash": file_hash,
+                    }
 
+                create_index(documents)
+
+                st.success(
+                    f"✅ {uploaded_file.name} indexed."
+                )
+
+        except Exception as e:
+
+            st.error(
+                f"Error: {str(e)}"
+            )
 
 # ============================================
 # USER QUERY
@@ -117,65 +129,82 @@ query = st.text_input(
 
 if query:
 
-    with st.spinner(
-        "Generating Answer..."
-    ):
-
-        start_time = time.time()
-
-        query_category = detect_query_category(
-            query
-        )
-
-        st.info(
-            f"Detected Query Category: "
-            f"{query_category}"
-        )
-
-        query_engine = get_query_engine(
-            category=query_category,
-            top_k=top_k,
-        )
-
-        response = query_engine.query(query)
-
-        if not response.response:
-            st.warning("No relevant documents found.")
-        else:
-            st.write(response.response)
-
-        response_time = round(
-            time.time() - start_time,
-            2
-        )
-
-        st.subheader("📌 Answer")
-
-        st.write(str(response))
-
-        st.subheader(
-            "📚 Retrieved Chunks"
-        )
-
-        for i, node in enumerate(
-            response.source_nodes
+        with st.spinner(
+            "Generating Answer..."
         ):
 
-            st.markdown(
-                f"### Chunk {i+1}"
-            )
+            try:
 
-            st.write(
-                node.node.text[:500]
-            )
+                start_time = time.time()
 
-            st.write(
-                node.node.metadata
-            )
+                # Create hybrid query engine
+                query_engine = get_query_engine(
+                    top_k=top_k,
+                )
 
-            st.markdown("---")
+                # Query
+                response = query_engine.query(
+                    query
+                )
 
-        st.caption(
-            f"⏱ Response Time: "
-            f"{response_time} seconds"
-        )
+                response_time = round(
+                    time.time() - start_time,
+                    2
+                )
+
+                # ====================================
+                # ANSWER
+                # ====================================
+
+                st.subheader("📌 Answer")
+
+                if not response.response.strip():
+
+                    st.warning(
+                        "No response generated."
+                    )
+
+                else:
+
+                    st.write(
+                        response.response
+                    )
+
+                # ====================================
+                # RETRIEVED CHUNKS
+                # ====================================
+
+                st.subheader(
+                    "📚 Retrieved Chunks"
+                )
+
+                for i, node in enumerate(
+                    response.source_nodes
+                ):
+
+                    st.markdown(
+                        f"### Chunk {i+1}"
+                    )
+
+                    st.write(
+                        node.node.text[:500]
+                    )
+
+                    st.write(
+                        node.node.metadata
+                    )
+
+                    st.markdown("---")
+
+                # ====================================
+                # RESPONSE TIME
+                # ====================================
+
+                st.caption(
+                    f"⏱ Response Time: "
+                    f"{response_time} seconds"
+                )
+
+            except Exception as e:
+
+                st.error(f"Query Error: {e}")
