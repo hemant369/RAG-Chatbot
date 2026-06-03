@@ -1,6 +1,14 @@
 import time
 import streamlit as st
 
+from utils.chat_memory import (
+    initialize_memory,
+    add_user_message,
+    add_assistant_message,
+    get_chat_context,
+    clear_memory,
+)
+
 from utils.document_loader import (
     load_uploaded_document,
 )
@@ -15,168 +23,307 @@ from utils.query_engine import (
     get_query_engine,
 )
 
+from database.chroma_db import (
+    chroma_collection,
+)
+
 
 # ============================================
 # PAGE CONFIG
 # ============================================
 
 st.set_page_config(
-    page_title="Advanced RAG App",
-    layout="wide"
+    page_title="Advanced RAG Assistant",
+    page_icon="🤖",
+    layout="wide",
 )
 
-st.title("📄 Advanced Local RAG App")
+# ============================================
+# CUSTOM CSS
+# ============================================
 
+st.markdown(
+    """
+    <style>
 
+    .block-container {
+        max-width: 1100px;
+        padding-top: 1rem;
+    }
+
+    .stChatMessage {
+        border-radius: 12px;
+        padding: 10px;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ============================================
+# INITIALIZE MEMORY
+# ============================================
+
+initialize_memory()
+
+# ============================================
+# HEADER
+# ============================================
+
+st.title("🤖 Advanced RAG Assistant")
+st.caption(
+    "Upload documents and chat with your knowledge base"
+)
 
 # ============================================
 # SIDEBAR
 # ============================================
 
-top_k = st.sidebar.slider(
-    "Similarity Top K",
-    1,
-    20,
-    10,
-    key="top_k_slider"
-)
+with st.sidebar:
 
+    st.header("📚 Knowledge Base")
 
-# ============================================
-# FILE UPLOAD
-# ============================================
+    uploaded_files = st.file_uploader(
+        "Upload Documents",
+        type=[
+            "pdf",
+            "txt",
+            "md",
+            "csv",
+            "json",
+            "yaml",
+            "yml",
+        ],
+        accept_multiple_files=True,
+    )
 
-uploaded_files = st.file_uploader(
-    "Upload Documents",
-    type=[
-        "pdf",
-        "txt",
-        "md",
-        "csv",
-        "json",
-        "yaml",
-        "yml"
-    ],
-    accept_multiple_files=True
-)
-
-
-# ============================================
-# DOCUMENT INDEXING
-# ============================================
-
-if uploaded_files and st.button(
-    "Load Document"
-):
-
-    with st.spinner(
-        "Indexing document..."
-    ):
-
-        try:
-
-            for uploaded_file in uploaded_files:
-
-                # Load documents
-                documents = load_uploaded_document(
-                    uploaded_file
-                )
-
-                # Generate document hash
-                file_hash = generate_file_hash(
-                    uploaded_file
-                )
-
-                # Check if already indexed
-                if document_exists(file_hash):
-                    st.warning(
-                        f"{uploaded_file.name} already indexed."
-                        )
-
-                    continue
-
-                for doc in documents:
-
-                    doc.metadata = {
-                        "file_name": uploaded_file.name,
-                        "file_hash": file_hash,
-                    }
-
-                create_index(documents)
-
-                st.success(
-                    f"✅ {uploaded_file.name} indexed."
-                )
-
-        except Exception as e:
-
-            st.error(
-                f"Error: {str(e)}"
-            )
-
-# ============================================
-# USER QUERY
-# ============================================
-
-query = st.text_input(
-    "Ask a question"
-)
-
-
-# ============================================
-# QUERYING
-# ============================================
-
-if query:
+    if st.button("📥 Index Documents"):
 
         with st.spinner(
-            "Generating Answer..."
+            "Indexing documents..."
         ):
 
             try:
 
-                start_time = time.time()
+                for uploaded_file in uploaded_files:
 
-                # Create hybrid query engine
-                query_engine = get_query_engine(
-                    top_k=top_k,
-                )
-
-                # Query
-                response = query_engine.query(
-                    query
-                )
-
-                response_time = round(
-                    time.time() - start_time,
-                    2
-                )
-
-                # ====================================
-                # ANSWER
-                # ====================================
-
-                st.subheader("📌 Answer")
-
-                if not response.response.strip():
-
-                    st.warning(
-                        "No response generated."
+                    documents = load_uploaded_document(
+                        uploaded_file
                     )
 
-                else:
-
-                    st.write(
-                        response.response
+                    file_hash = generate_file_hash(
+                        uploaded_file
                     )
 
-                # ====================================
-                # RETRIEVED CHUNKS
-                # ====================================
+                    if document_exists(
+                        file_hash
+                    ):
 
-                st.subheader(
-                    "📚 Retrieved Chunks"
+                        st.warning(
+                            f"{uploaded_file.name} already indexed."
+                        )
+
+                        continue
+
+                    for doc in documents:
+
+                        doc.metadata = {
+                            "file_name": uploaded_file.name,
+                            "file_hash": file_hash,
+                        }
+
+                    create_index(
+                        documents
+                    )
+
+                    st.success(
+                        f"✅ {uploaded_file.name} indexed"
+                    )
+
+            except Exception as e:
+
+                st.error(
+                    f"Error: {str(e)}"
                 )
+
+    st.divider()
+
+    top_k = st.slider(
+        "Similarity Top K",
+        min_value=1,
+        max_value=20,
+        value=10,
+    )
+
+    st.divider()
+
+    st.subheader(
+        "📄 Indexed Documents"
+    )
+
+    try:
+
+        results = chroma_collection.get()
+
+        if len(results["ids"]) > 0:
+
+            unique_files = set()
+
+            for meta in results.get(
+                "metadatas",
+                [],
+            ):
+
+                if (
+                    meta
+                    and "file_name" in meta
+                ):
+
+                    unique_files.add(
+                        meta["file_name"]
+                    )
+
+            for file_name in sorted(
+                unique_files
+            ):
+
+                st.success(
+                    file_name
+                )
+
+        else:
+
+            st.info(
+                "No documents indexed."
+            )
+
+    except:
+
+        st.info(
+            "No documents indexed."
+        )
+
+    st.divider()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        if st.button(
+            "🗑 Clear"
+        ):
+
+            clear_memory()
+            st.rerun()
+
+    with col2:
+
+        if st.button(
+            "🔄 New Chat"
+        ):
+
+            clear_memory()
+            st.rerun()
+
+
+# ============================================
+# CHAT HISTORY
+# ============================================
+
+for msg in st.session_state.chat_history:
+
+    with st.chat_message(
+        msg["role"]
+    ):
+
+        st.markdown(
+            msg["content"]
+        )
+
+# ============================================
+# CHAT INPUT
+# ============================================
+
+query = st.chat_input(
+    "Ask something about your documents..."
+)
+
+# ============================================
+# QUERY
+# ============================================
+
+if query:
+
+    with st.chat_message(
+        "user"
+    ):
+
+        st.markdown(
+            query
+        )
+
+    add_user_message(
+        query
+    )
+
+    try:
+
+        start_time = time.time()
+
+        query_engine = get_query_engine(
+            top_k=top_k
+        )
+
+        chat_context = (
+            get_chat_context()
+        )
+
+        enhanced_query = f"""
+Previous Conversation:
+
+{chat_context}
+
+Current Question:
+
+{query}
+"""
+
+        response = query_engine.query(
+            enhanced_query
+        )
+
+        answer = response.response
+
+        if not answer.strip():
+
+            answer = (
+                "No response generated."
+            )
+
+        with st.chat_message(
+            "assistant"
+        ):
+
+            placeholder = st.empty()
+
+            streamed_text = ""
+
+            for word in answer.split():
+
+                streamed_text += (
+                    word + " "
+                )
+
+                placeholder.markdown(
+                    streamed_text
+                )
+
+                time.sleep(0.01)
+
+            with st.expander(
+                "📖 Sources"
+            ):
 
                 for i, node in enumerate(
                     response.source_nodes
@@ -190,21 +337,38 @@ if query:
                         node.node.text[:500]
                     )
 
-                    st.write(
+                    st.json(
                         node.node.metadata
                     )
 
-                    st.markdown("---")
+            response_time = round(
+                time.time()
+                - start_time,
+                2,
+            )
 
-                # ====================================
-                # RESPONSE TIME
-                # ====================================
+            with st.expander(
+                "⚙️ Query Details"
+            ):
 
-                st.caption(
-                    f"⏱ Response Time: "
-                    f"{response_time} seconds"
+                st.write(
+                    f"Response Time: {response_time} sec"
                 )
 
-            except Exception as e:
+                st.write(
+                    f"Retrieved Chunks: {len(response.source_nodes)}"
+                )
 
-                st.error(f"Query Error: {e}")
+        add_assistant_message(
+            answer
+        )
+
+    except Exception as e:
+
+        with st.chat_message(
+            "assistant"
+        ):
+
+            st.error(
+                f"Query Error: {e}"
+            )
