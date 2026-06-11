@@ -27,6 +27,10 @@ from database.chroma_db import (
     chroma_collection,
 )
 
+from agents.rag_agent import (
+    get_agent,
+)
+
 
 # ============================================
 # PAGE CONFIG
@@ -250,7 +254,7 @@ query = st.chat_input(
 )
 
 # ============================================
-# QUERY
+# QUERYING
 # ============================================
 
 if query:
@@ -271,9 +275,19 @@ if query:
 
         start_time = time.time()
 
-        query_engine = get_query_engine(
-            top_k=top_k
+        # ====================================
+        # LOAD AGENT
+        # ====================================
+
+        from agents.rag_agent import (
+            get_agent,
         )
+
+        agent = get_agent()
+
+        # ====================================
+        # CHAT MEMORY
+        # ====================================
 
         chat_context = (
             get_chat_context()
@@ -289,17 +303,34 @@ Current Question:
 {query}
 """
 
-        response = query_engine.query(
-            enhanced_query
+        # ====================================
+        # AGENT EXECUTION
+        # ====================================
+
+        response = agent.invoke(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": enhanced_query,
+                    }
+                ]
+            }
         )
 
-        answer = response.response
+        answer = str(response["messages"][-1].content)
+
+        
 
         if not answer.strip():
 
             answer = (
                 "No response generated."
             )
+
+        # ====================================
+        # ASSISTANT RESPONSE
+        # ====================================
 
         with st.chat_message(
             "assistant"
@@ -321,26 +352,6 @@ Current Question:
 
                 time.sleep(0.01)
 
-            with st.expander(
-                "📖 Sources"
-            ):
-
-                for i, node in enumerate(
-                    response.source_nodes
-                ):
-
-                    st.markdown(
-                        f"### Chunk {i+1}"
-                    )
-
-                    st.write(
-                        node.node.text[:500]
-                    )
-
-                    st.json(
-                        node.node.metadata
-                    )
-
             response_time = round(
                 time.time()
                 - start_time,
@@ -352,11 +363,13 @@ Current Question:
             ):
 
                 st.write(
-                    f"Response Time: {response_time} sec"
+                    f"Response Time: "
+                    f"{response_time} sec"
                 )
 
                 st.write(
-                    f"Retrieved Chunks: {len(response.source_nodes)}"
+                    "Response generated "
+                    "through Agentic RAG"
                 )
 
         add_assistant_message(
