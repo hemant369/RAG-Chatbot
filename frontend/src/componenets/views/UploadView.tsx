@@ -3,82 +3,96 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Upload, CheckCircle, AlertCircle } from "lucide-react";
 import { uploadDocument } from "../../api/client";
+import { useApiCall } from "../../hooks/useApiCall";
 
 export function UploadView() {
   const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
-  const [message, setMessage] = useState("");
+
+  const uploadApi = useApiCall({
+    onSuccess: () => {
+      setFile(null);
+    },
+  });
 
   async function handleUpload() {
     if (!file) return;
-    setLoading(true);
-    try {
-      await uploadDocument(file);
-      setStatus("success");
-      setMessage("Document uploaded successfully!");
-      setFile(null);
-      setTimeout(() => setStatus("idle"), 3000);
-    } catch (e) {
-      setStatus("error");
-      setMessage("Failed to upload document");
-    } finally {
-      setLoading(false);
-    }
+    await uploadApi.execute(() => uploadDocument(file));
   }
 
   return (
-    <div className="flex flex-col h-full p-6 gap-6">
+    <div className="flex flex-col h-full p-8 gap-6 bg-gradient-to-br from-slate-50 to-white">
       <div>
-        <h1 className="text-2xl font-bold text-slate-950">Upload Documents</h1>
-        <p className="text-sm text-slate-500">Add files to your knowledge base</p>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+          Upload Documents
+        </h1>
+        <p className="text-sm text-slate-600 mt-1">Add files to your knowledge base for AI-powered search</p>
       </div>
 
-      <Card className="bg-white border-slate-200 shadow-sm p-8 flex-1 flex items-center justify-center">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 mx-auto flex items-center justify-center">
-            <Upload className="w-8 h-8 text-white" />
+      <Card className="bg-white border-slate-200 shadow-lg rounded-2xl p-10 flex-1 flex items-center justify-center">
+        <div className="text-center space-y-6 max-w-lg w-full">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 mx-auto flex items-center justify-center shadow-xl">
+            <Upload className="w-10 h-10 text-white" />
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Upload Documents</h2>
-            <p className="text-sm text-slate-500 mt-1">PDF, TXT, MD, JSON, YAML</p>
+            <h2 className="text-xl font-semibold text-slate-900">Upload Your Documents</h2>
+            <p className="text-sm text-slate-600 mt-2">Supports multiple file formats</p>
           </div>
 
-          <label className="flex flex-col gap-2">
-            <div className="px-4 py-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-slate-400 transition cursor-pointer bg-slate-50 hover:bg-slate-100">
+          <label className="flex flex-col gap-2 cursor-pointer group">
+            <div className="px-8 py-10 rounded-2xl border-2 border-dashed border-slate-300 group-hover:border-purple-400 transition-all bg-gradient-to-br from-slate-50 to-white group-hover:from-purple-50 group-hover:to-blue-50 group-hover:shadow-md">
               <input
                 type="file"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 className="hidden"
                 accept=".pdf,.txt,.md,.json,.yaml,.yml,.csv"
               />
-              <p className="text-sm text-slate-700">
-                {file ? file.name : "Click to select or drag & drop"}
-              </p>
+              <div className="space-y-3">
+                <p className="text-base font-medium text-slate-800">
+                  {file ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      {file.name}
+                    </span>
+                  ) : (
+                    "Click to select or drag & drop"
+                  )}
+                </p>
+                <p className="text-xs text-slate-500">PDF, TXT, MD, JSON, YAML, CSV</p>
+              </div>
             </div>
           </label>
 
           {file && (
-            <Button 
-              onClick={handleUpload} 
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+            <Button
+              onClick={handleUpload}
+              disabled={uploadApi.isLoading}
+              className="w-full h-12 text-base font-medium bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all rounded-xl"
             >
-              {loading ? "Uploading..." : "Upload Document"}
+              {uploadApi.isLoading ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Uploading...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Upload className="w-5 h-5" />
+                  Upload Document
+                </span>
+              )}
             </Button>
           )}
 
-          {status === "success" && (
-            <div className="flex gap-2 items-center text-green-400 text-sm">
-              <CheckCircle className="w-4 h-4" />
-              {message}
+          {uploadApi.isSuccess && (
+            <div className="flex gap-2 items-center justify-center text-green-600 bg-green-50 border border-green-200 rounded-xl px-4 py-3 animate-fadeIn">
+              <CheckCircle className="w-5 h-5" />
+              <span className="text-sm font-medium">Document uploaded successfully!</span>
             </div>
           )}
-          {status === "error" && (
-            <div className="flex gap-2 items-center text-red-400 text-sm">
-              <AlertCircle className="w-4 h-4" />
-              {message}
+          {uploadApi.isError && (
+            <div className="flex gap-2 items-center justify-center text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-fadeIn">
+              <AlertCircle className="w-5 h-5" />
+              <span className="text-sm font-medium">{uploadApi.error || "Failed to upload document"}</span>
             </div>
           )}
         </div>

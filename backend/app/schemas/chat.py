@@ -23,15 +23,3 @@ class ChatResponse(BaseModel):
     answer: str
     agent_reasoning: AgentReasoning
     sources: List[Dict[str, Any]] = []
-
-class SearchRequest(BaseModel):
-    query: str
-    top_k: int = 5
-
-class SearchResult(BaseModel):
-    content: str
-    metadata: Dict[str, Any]
-    score: float
-
-class SearchResponse(BaseModel):
-    results: List[SearchResult]

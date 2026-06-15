@@ -1,13 +1,12 @@
-import { MessageCircle, Upload, Library, Settings, Zap } from "lucide-react";
+import { MessageCircle, Library, Info, Zap } from "lucide-react";
 import { Button } from "../ui/button";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 
 const navItems = [
   { id: "chat", label: "Chat", icon: MessageCircle },
-  { id: "upload", label: "Upload Docs", icon: Upload },
   { id: "library", label: "Library", icon: Library },
-  { id: "settings", label: "Settings", icon: Settings }
+  { id: "settings", label: "System Info", icon: Info }
 ];
 
 interface SidebarProps {
@@ -41,8 +40,18 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
           <Zap className="w-6 h-6 text-white" />
         </div>
-        <div>
-          <h1 className="text-lg font-bold text-white">RAG</h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-white">RAG</h1>
+            <div
+              className={clsx(
+                "w-2.5 h-2.5 rounded-full shadow-lg transition-all",
+                backendOnline
+                  ? "bg-green-500 animate-pulse shadow-green-500/50"
+                  : "bg-red-500 shadow-red-500/50"
+              )}
+            />
+          </div>
           <p className="text-xs text-slate-400">Assistant</p>
         </div>
       </div>
@@ -71,26 +80,6 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         })}
       </nav>
 
-      {/* Divider */}
-      <div className="flex-1 border-t border-white/10" />
-
-      {/* Status Badge */}
-      <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/10">
-        <div className="flex items-center gap-2 mb-2">
-          <div
-            className={clsx(
-              "w-2 h-2 rounded-full",
-              backendOnline ? "bg-green-500 animate-pulse" : "bg-red-500"
-            )}
-          />
-          <span className="text-xs font-medium text-slate-300">
-            {backendOnline ? "Connected" : "Disconnected"}
-          </span>
-        </div>
-        <p className="text-xs text-slate-400">
-          {backendOnline ? "Backend online" : "Backend offline"}
-        </p>
-      </div>
     </div>
   );
 }

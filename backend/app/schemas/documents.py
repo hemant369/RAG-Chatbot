@@ -1,12 +1,10 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+from typing import List
 
 class DocumentMetadata(BaseModel):
     doc_id: str
     filename: str
     file_hash: str
-    indexed_at: Optional[datetime] = None
     chunk_count: int
 
 class DocumentListResponse(BaseModel):
@@ -16,11 +14,4 @@ class DocumentUploadResponse(BaseModel):
     success: bool
     doc_id: str
     filename: str
-    message: str
-
-class DocumentDeleteRequest(BaseModel):
-    doc_id: str
-
-class DocumentDeleteResponse(BaseModel):
-    success: bool
     message: str

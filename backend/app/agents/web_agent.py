@@ -1,14 +1,8 @@
 from textwrap import dedent
 from langchain.agents import create_agent
-from langchain_ollama import ChatOllama
 from app.agents.tools import web_search
 from app.utils.logger import logger
-
-
-llm = ChatOllama(
-    model="qwen2.5:3b",
-    temperature=0,
-)
+from app.models.llm import chat_llm as llm
 
 SYSTEM_PROMPT = dedent("""
     You are a Web Research Agent.

@@ -9,19 +9,25 @@ from app.models.embedding_model import embed_model
 from app.models.llm import llm
 from app.models.reranker import reranker
 from app.utils.logger import logger
+from app.config import settings
 
 
-_query_engine = None
+_query_engine_cache = {}  # Cache by top_k
 _bm25_nodes = None  # cached separately
 
 
-def _load_bm25_nodes() -> list:
+def _load_bm25_nodes(limit: int = None) -> list:
     global _bm25_nodes
     if _bm25_nodes is not None:
         return _bm25_nodes
 
     logger.info("Loading BM25 corpus from ChromaDB")
-    results = chroma_collection.get(limit=500)  # safety limit
+
+    # Get total count first
+    total = chroma_collection.count()
+    actual_limit = limit or min(total, settings.BM25_CORPUS_LIMIT)
+
+    results = chroma_collection.get(limit=actual_limit)
 
     if not results["ids"]:
         raise ValueError("No documents found in vector database.")
@@ -31,7 +37,7 @@ def _load_bm25_nodes() -> list:
         for text, metadata in zip(results["documents"], results["metadatas"])
     ]
 
-    logger.info(f"BM25 corpus loaded: {len(_bm25_nodes)} nodes")
+    logger.info(f"BM25 corpus loaded: {len(_bm25_nodes)}/{total} nodes")
     return _bm25_nodes
 
 
@@ -45,8 +51,8 @@ def create_index(documents):
     logger.info("Index created successfully")
 
     # invalidate both caches on new upload
-    global _query_engine, _bm25_nodes
-    _query_engine = None
+    global _query_engine_cache, _bm25_nodes
+    _query_engine_cache = {}
     _bm25_nodes = None  # force BM25 corpus rebuild
 
     return index
@@ -85,8 +91,15 @@ def _build_query_engine(top_k: int = 10) -> RetrieverQueryEngine:
     )
 
 
-def get_query_engine(top_k: int = 10) -> RetrieverQueryEngine:
-    global _query_engine
-    if _query_engine is None:
-        _query_engine = _build_query_engine(top_k)
-    return _query_engine
+def get_query_engine(top_k: int = None) -> RetrieverQueryEngine:
+    """Get query engine with proper caching by top_k value."""
+    global _query_engine_cache
+
+    # Use default from settings if not specified
+    if top_k is None:
+        top_k = settings.RETRIEVAL_TOP_K
+
+    if top_k not in _query_engine_cache:
+        _query_engine_cache[top_k] = _build_query_engine(top_k)
+
+    return _query_engine_cache[top_k]

@@ -1,14 +1,11 @@
 from textwrap import dedent
-from langchain_ollama import ChatOllama
 from app.agents.rag_agent import get_rag_agent
 from app.agents.web_agent import get_web_agent
 from app.agents.comparison_agent import compare_answers
 from app.utils.query_rewriter import rewrite_query
 from app.utils.agent_extract import extract_agent_answer
 from app.utils.logger import logger
-
-
-llm = ChatOllama(model="qwen2.5:3b", temperature=0)
+from app.models.llm import chat_llm as llm
 
 
 class AgenticRAG:

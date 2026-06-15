@@ -6,6 +6,7 @@ import os
 
 from app.routes import chat, documents, logs
 from app.utils.logger import setup_logger
+from app.config import settings
 
 load_dotenv()
 logger = setup_logger(__name__)
@@ -37,11 +38,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+logger.info(f"CORS configured for origins: {settings.ALLOWED_ORIGINS}")
 
 app.include_router(chat)
 app.include_router(documents)
@@ -64,10 +66,9 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
     uvicorn.run(
         "app.main:app",
         host="127.0.0.1",
-        port=port,
+        port=settings.PORT,
         reload=True,
     )

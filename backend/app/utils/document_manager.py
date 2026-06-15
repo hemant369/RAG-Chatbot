@@ -14,12 +14,13 @@ class DocumentManager:
         self.collection = chroma_collection
 
     def generate_file_hash(self, file_path: str) -> str:
-        hasher = hashlib.md5()
+        """Generate SHA256 hash for file deduplication."""
+        hasher = hashlib.sha256()
         with open(file_path, "rb") as f:
             while chunk := f.read(8192):
                 hasher.update(chunk)
         file_hash = hasher.hexdigest()
-        logger.debug(f"Generated file hash: {file_hash} for {file_path}")
+        logger.debug(f"Generated SHA256 hash: {file_hash} for {file_path}")
         return file_hash
 
     def document_exists(self, file_hash: str) -> bool:

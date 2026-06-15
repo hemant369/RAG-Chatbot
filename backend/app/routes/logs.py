@@ -4,6 +4,8 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
+from app.config import settings
+
 router = APIRouter(prefix="/logs", tags=["logs"])
 LOG_FILE = Path("logs") / "rag.log"
 
@@ -52,7 +54,7 @@ async def get_logs():
             for line in log_file.readlines()
             if line.strip()
         ]
-    return {"logs": lines[-100:]}
+    return {"logs": lines[-settings.MAX_LOG_LINES:]}
 
 
 @router.get("/stream")

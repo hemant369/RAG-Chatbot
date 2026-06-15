@@ -1,12 +1,6 @@
 from textwrap import dedent
-from langchain_ollama import ChatOllama
 from app.utils.logger import logger
-
-
-llm = ChatOllama(
-    model="qwen2.5:3b",
-    temperature=0,
-)
+from app.models.llm import chat_llm as llm
 
 
 def compare_answers(question: str, document_answer: str, web_answer: str) -> str:

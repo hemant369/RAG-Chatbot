@@ -1,14 +1,15 @@
 from llama_index.core.postprocessor import SentenceTransformerRerank
 from app.utils.logger import logger
+from app.config import settings
 
 
 def _load_reranker() -> SentenceTransformerRerank:
     try:
         reranker = SentenceTransformerRerank(
-            model="BAAI/bge-reranker-base",
-            top_n=3,
+            model=settings.RERANKER_MODEL,
+            top_n=settings.RERANKER_TOP_N,
         )
-        logger.info("Reranker model initialized: BAAI/bge-reranker-base")
+        logger.info(f"Reranker model initialized: {settings.RERANKER_MODEL} (top_n={settings.RERANKER_TOP_N})")
         return reranker
     except Exception as e:
         logger.error(f"Reranker initialization failed: {e}")

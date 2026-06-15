@@ -1,6 +1,7 @@
 from app.utils.query_engine import get_query_engine
-from app.database.chroma_db import chroma_collection
+from app.utils.document_manager import DocumentManager
 from app.utils.logger import logger
+from app.config import settings
 
 from langchain_core.tools import tool
 from ddgs import DDGS
@@ -54,43 +55,24 @@ def list_documents() -> str:
     """
     List all indexed documents.
     """
-
     logger.info("Tool list_documents called")
 
     try:
+        doc_manager = DocumentManager()
+        documents = doc_manager.list_documents()
 
-        results = chroma_collection.get()
-
-        if not results["ids"]:
-
+        if not documents:
             logger.info("No documents indexed")
-
             return "No documents indexed."
 
-        files = set()
+        # Extract unique filenames
+        files = [doc["filename"] for doc in documents]
 
-        for metadata in results.get("metadatas", []):
-
-            if metadata and "file_name" in metadata:
-
-                files.add(metadata["file_name"])
-
-        if not files:
-
-            logger.info("No documents found in metadata")
-
-            return "No documents found."
-
-        logger.info(
-            f"list_documents returned {len(files)} files"
-        )
-
+        logger.info(f"list_documents returned {len(files)} files")
         return "\n".join(sorted(files))
 
     except Exception as e:
-
         logger.exception("list_documents tool failed")
-
         return f"Document Tool Error: {str(e)}"
 
 
@@ -123,7 +105,7 @@ def web_search(query: str) -> str:
             search_results = list(
                 ddgs.text(
                     query,
-                    max_results=5,
+                    max_results=settings.WEB_SEARCH_MAX_RESULTS,
                 )
             )
 
