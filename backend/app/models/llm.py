@@ -7,8 +7,8 @@ from app.utils.logger import logger
 # LlamaIndex LLM (for query engine)
 llm = Ollama(
     model=settings.LLM_MODEL,
-    request_timeout=settings.LLM_TIMEOUT,
     temperature=settings.LLM_TEMPERATURE,
+    request_timeout=settings.LLM_TIMEOUT,
 )
 
 # LangChain LLM (for agents) - Single shared instance
