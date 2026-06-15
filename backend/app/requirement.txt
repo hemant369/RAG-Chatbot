@@ -1,0 +1,32 @@
+# Web UI
+streamlit>=1.28.0
+
+# LLM and Agent Framework
+ollama>=0.1.0
+langchain>=0.1.0
+langchain-community>=0.0.1
+langchain-ollama>=0.1.0
+langchain-core>=0.1.0
+
+# Vector Database
+chromadb>=0.4.0
+
+# Document Processing
+pypdf>=3.17.0
+pyyaml>=6.0
+
+# Embedding Models
+sentence-transformers>=2.2.0
+huggingface-hub>=0.17.0
+
+# LLaMA Index (for document indexing and retrieval)
+llama-index>=0.9.0
+llama-index-embeddings-huggingface>=0.1.0
+llama-index-llms-ollama>=0.1.0
+llama-index-vector-stores-chroma>=0.1.0
+
+# Web Search
+duckduckgo-search>=3.9.0
+
+# Utilities
+python-dotenv>=1.0.0

@@ -1,92 +1,119 @@
-# Advanced RAG Assistant
+# Agentic RAG (Ollama + Qwen 2.5)
 
-A local retrieval-augmented generation (RAG) demo using Streamlit, Ollama, LlamaIndex, and ChromaDB.
+Upload documents (PDF/TXT/MD/CSV/JSON/YAML), ask questions, and get answers grounded in your uploaded content. The system can also use web search when your question requires up-to-date or public information.
 
-## What this project does
+## What’s inside
 
-This repository provides a local knowledge-base assistant that lets you:
-- Upload documents (`pdf`, `txt`, `md`, `csv`, `json`, `yaml`, `yml`)
-- Index them into a persistent ChromaDB vector store
-- Query the document collection using a local `qwen2.5:3b` Ollama model
-- Use a hybrid retrieval pipeline combining vector similarity, BM25, and reranking
-- Chat with your document corpus while preserving session history
+### Agentic routing
+A **Supervisor Agent** decides which route to use:
+- **RAG**: use uploaded documents only
+- **WEB**: use public internet info only
+- **COMPARE**: run both RAG + WEB and synthesize a single answer
+- **CHITCHAT**: greetings/casual chat without retrieval
 
-## Key features
+See: `flow-diagram.md`
 
-- Streamlit-powered web interface
-- Multi-file upload and indexing
-- Duplicate detection via file content hashing
-- Persistent ChromaDB storage under `db/chroma_db`
-- Hybrid retrieval with a vector retriever, BM25 retriever, and reciprocal rerank fusion
-- Agent-driven query execution with tools for document search, calculation, and document listing
-- Simple chat memory for conversational context
+### Hybrid retrieval (for RAG)
+The RAG pipeline uses a hybrid retrieval approach:
+- vector similarity search (Chroma)
+- keyword retrieval (BM25)
+- reciprocal rank fusion
+- reranking for better context selection
 
-## Requirements
+See: `hybrid-flow.md`
 
-- Python 3.10+
-- Ollama installed and running locally
-- Local access to the `qwen2.5:3b` model in Ollama
+### Logging & traceability
+The backend logs selected routes, steps, and sources.
 
-Install Python dependencies:
+Logs: `backend/logs/rag.log` (and via the `/logs` API)
 
+## Prerequisites
+
+- Python 3.10+ (recommended)
+- Node.js + npm (only if you use the React frontend)
+- Ollama installed + the model pulled:
+  - `qwen2.5:3b`
+
+## Local setup
+
+### 1) Backend (FastAPI)
+
+The backend lives in `backend/app/`.
+
+#### Install dependencies
 ```bash
+cd backend/app
 pip install -r requirement.txt
 ```
 
-## Setup
+#### Start the API server
+```bash
+cd backend/app
+python -m app.main
+```
 
-1. Start Ollama locally and ensure the `qwen2.5:3b` model is available.
-2. From the project root, run:
+The API docs will be available at:
+- `http://127.0.0.1:8000/docs`
 
+Health check:
+- `http://127.0.0.1:8000/health`
+
+### 2) Start the Streamlit UI (optional)
+
+The Streamlit app uses the same RAG logic.
+
+#### Run
 ```bash
 streamlit run app.py
 ```
 
-3. Open the Streamlit URL shown in the terminal.
+Then open the printed localhost URL in your browser.
+
+## Endpoints (FastAPI)
+
+- **Chat**: `POST /chat/message`
+  - Body includes: `query`, `chat_history` (list of `{role, content}`)
+  - Response includes: `answer`, `sources`, and reasoning trace
+
+- **Documents**:
+  - `POST /documents/upload` (multipart upload)
+  - `GET /documents/list`
+  - `GET /documents/{doc_id}`
+  - `DELETE /documents/{doc_id}`
+
+- **Logs**:
+  - `GET /logs`
+  - `GET /logs/stream`
 
 ## Usage
 
-1. Upload supported documents in the sidebar.
-2. Click `Index Documents` to store them in ChromaDB.
-3. Enter a query in the chat input at the bottom.
-4. Review the assistant response and query details.
-5. Use `Clear` or `New Chat` to reset the conversation context.
+1. Upload a document via the UI or `/documents/upload`.
+2. Ask a question:
+   - If the question matches the documents → the system uses **RAG**.
+   - If the question needs up-to-date public info → it uses **WEB**.
+   - If it needs both → it uses **COMPARE**.
+
+## Configuration notes
+
+- The core LLM is configured in `backend/app/core/agentic_rag.py` and uses:
+  - `model="qwen2.5:3b"`
+  - `temperature=0`
+
+If you want to change the model, update the Ollama model name in:
+- `backend/app/core/agentic_rag.py`
+- `backend/app/agents/rag_agent.py`
+- `backend/app/agents/web_agent.py`
+- `backend/app/agents/comparison_agent.py`
 
 ## Project structure
 
-- `app.py` - Streamlit UI, upload/index actions, chat flow, and session state
-- `requirement.txt` - Python dependencies
-- `database/chroma_db.py` - ChromaDB persistent client and vector store setup
-- `models/`
-  - `embedding_model.py` - Embedding model for document vectors
-  - `llm.py` - Ollama LLM client configuration
-  - `reranker.py` - Sentence transformer reranker for retrieved results
-- `utils/`
-  - `chat_memory.py` - Chat history management in Streamlit session state
-  - `document_loader.py` - Loads uploaded files into document objects
-  - `document_manager.py` - Hash-based duplicate detection for uploaded files
-  - `query_engine.py` - Builds the hybrid retrieval/query engine
-- `agents/`
-  - `rag_agent.py` - Agent creation using Ollama and tool integration
-  - `tools.py` - Tools for searching indexed documents, performing calculations, and listing files
+- `backend/app/core/agentic_rag.py` — supervisor + route execution
+- `backend/app/agents/` — RAG agent, Web agent, Comparison agent, tools
+- `backend/app/utils/` — indexing/retrieval helpers, query rewriting, memory, logging
+- `backend/app/routes/` — FastAPI routes (chat, documents, logs)
+- `backend/app/database/` — Chroma DB wrapper
 
-## Supported file formats
+## Problem & solutions
 
-- `pdf`
-- `txt`
-- `md`
-- `csv`
-- `json`
-- `yaml`
-- `yml`
+See `Problem-Solved.md` for the problem which is solved by this Agentic-RAG
 
-## Notes
-
-- Indexed document chunks are stored in a local ChromaDB persistent store.
-- Document uploads are hashed so reruns do not re-index the same file.
-- Query execution uses a hybrid retriever, with vector search and BM25 fused by LlamaIndex.
-- The application supports conversational context through session-based chat memory.
-
-## License
-
-This repository does not include a license by default. Add one if you want to share or publish the project.
