@@ -38,9 +38,30 @@ def search_documents(question: str) -> str:
     logger.info(f"Tool search_documents called with question: {question}")
 
     try:
+        # First check if any documents exist
+        doc_manager = DocumentManager()
+        documents = doc_manager.list_documents()
+
+        if not documents:
+            logger.warning("No documents indexed in the system")
+            return (
+                "No documents are currently indexed in the system. "
+                "Please ask the user to upload documents first before searching."
+            )
+
+        # Perform the search
         query_engine = get_query_engine()
         response = query_engine.query(question)
 
+        # Check if we got meaningful results
+        if not response.response or response.response.strip() == "":
+            logger.warning(f"Empty response for query: {question}")
+            return (
+                f"I searched the indexed documents but couldn't find specific information about '{question}'. "
+                "The documents may not contain information on this topic."
+            )
+
+        # Extract sources
         sources = []
         for node in response.source_nodes:
             file_name = node.metadata.get("file_name", "Unknown")
@@ -49,12 +70,25 @@ def search_documents(question: str) -> str:
 
         source_text = "\n".join(sources) if sources else "No sources found"
 
-        logger.info("search_documents tool completed successfully")
+        logger.info(f"search_documents tool completed successfully with {len(sources)} sources")
         return f"{response.response}\n\nSources:\n{source_text}"
 
+    except ValueError as ve:
+        # Specific handling for "No documents found" error
+        logger.warning(f"ValueError in search_documents: {str(ve)}")
+        if "No documents found" in str(ve):
+            return (
+                "No documents are currently indexed in the vector database. "
+                "Please ask the user to upload and index documents first."
+            )
+        return f"Search error: {str(ve)}"
+
     except Exception as e:
-        logger.exception("search_documents tool failed")
-        return f"Search Tool Error: {str(e)}"
+        logger.exception("search_documents tool failed with unexpected error")
+        return (
+            f"I encountered an error while searching the documents: {str(e)}. "
+            "This might be due to missing documents or a database issue."
+        )
 
 
 # ============================================
