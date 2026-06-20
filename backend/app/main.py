@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 from app.routes import chat, documents, logs
-from app.utils.logger import setup_logger, is_main_process
+from app.utils.logger import setup_logger
 from app.config import settings
 
 load_dotenv()
@@ -15,18 +15,13 @@ logger = setup_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    logger.info("Warming up query engine...")
     try:
         from app.utils.query_engine import get_query_engine
         get_query_engine()
-        logger.info("Query engine ready")
     except Exception as e:
         logger.warning(f"Query engine warmup skipped: {e}")
 
     yield
-
-    # shutdown
-    logger.info("Shutting down...")
 
 
 app = FastAPI(
@@ -43,9 +38,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
-
-if is_main_process():
-    logger.info(f"CORS configured for origins: {settings.ALLOWED_ORIGINS}")
 
 app.include_router(chat)
 app.include_router(documents)

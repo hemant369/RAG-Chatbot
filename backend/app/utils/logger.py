@@ -32,18 +32,4 @@ def setup_logger(name: str = "rag") -> logging.Logger:
     return logger
 
 
-def is_main_process() -> bool:
-    """
-    Check if this is the main process (not the reloader process).
-
-    When FastAPI runs with reload=True, it spawns a child process for hot reload.
-    This causes module-level code to run twice, creating duplicate logs.
-
-    Returns:
-        bool: True if this is the main process, False if reloader process
-    """
-    # Check if we're in the main process
-    return os.getenv("FASTAPI_MAIN_PROCESS") == "1" or not os.getenv("RUN_MAIN")
-
-
 logger = setup_logger("rag")

@@ -35,15 +35,12 @@ def search_documents(question: str) -> str:
 
     Returns: Answer with source citations (filename and page numbers)
     """
-    logger.info(f"Tool search_documents called with question: {question}")
-
     try:
         # First check if any documents exist
         doc_manager = DocumentManager()
         documents = doc_manager.list_documents()
 
         if not documents:
-            logger.warning("No documents indexed in the system")
             return (
                 "No documents are currently indexed in the system. "
                 "Please ask the user to upload documents first before searching."
@@ -55,7 +52,6 @@ def search_documents(question: str) -> str:
 
         # Check if we got meaningful results
         if not response.response or response.response.strip() == "":
-            logger.warning(f"Empty response for query: {question}")
             return (
                 f"I searched the indexed documents but couldn't find specific information about '{question}'. "
                 "The documents may not contain information on this topic."
@@ -65,17 +61,27 @@ def search_documents(question: str) -> str:
         sources = []
         for node in response.source_nodes:
             file_name = node.metadata.get("file_name", "Unknown")
-            page = node.metadata.get("page_label", "?")
+
+            # Debug log to see available metadata keys (only log first node to avoid spam)
+            if len(sources) == 0:
+                logger.debug(f"Available metadata keys: {list(node.metadata.keys())}")
+
+            # Try multiple possible keys for page number
+            page = (
+                node.metadata.get("page_label")
+                or node.metadata.get("page")
+                or node.metadata.get("page_number")
+                or "?"
+            )
+            # Convert to int and add 1 if it's a 0-based page number
+            if isinstance(page, int):
+                page = page + 1  # Convert 0-based to 1-based if needed
             sources.append(f"{file_name} (page {page})")
 
         source_text = "\n".join(sources) if sources else "No sources found"
-
-        logger.info(f"search_documents tool completed successfully with {len(sources)} sources")
         return f"{response.response}\n\nSources:\n{source_text}"
 
     except ValueError as ve:
-        # Specific handling for "No documents found" error
-        logger.warning(f"ValueError in search_documents: {str(ve)}")
         if "No documents found" in str(ve):
             return (
                 "No documents are currently indexed in the vector database. "
@@ -109,20 +115,15 @@ def list_documents() -> str:
 
     Returns: List of all indexed document filenames
     """
-    logger.info("Tool list_documents called")
-
     try:
         doc_manager = DocumentManager()
         documents = doc_manager.list_documents()
 
         if not documents:
-            logger.info("No documents indexed")
             return "No documents indexed."
 
         # Extract unique filenames
         files = [doc["filename"] for doc in documents]
-
-        logger.info(f"list_documents returned {len(files)} files")
         return "\n".join(sorted(files))
 
     except Exception as e:
@@ -160,15 +161,10 @@ def web_search(query: str) -> str:
 
     Returns: Search results with titles, content snippets, and URLs
     """
-
-    logger.info(f"Tool web_search called with query: {query}")
-
     try:
-
         results = []
 
         with DDGS() as ddgs:
-
             search_results = list(
                 ddgs.text(
                     query,
@@ -177,13 +173,9 @@ def web_search(query: str) -> str:
             )
 
         if not search_results:
-
-            logger.info("web_search found no results")
-
             return "No web results found."
 
         for item in search_results:
-
             title = item.get("title", "")
             body = item.get("body", "")
             href = item.get("href", "")
@@ -194,16 +186,10 @@ def web_search(query: str) -> str:
                 f"URL: {href}"
             )
 
-        logger.info(
-            f"web_search returned {len(results)} results"
-        )
-
         return "\n\n".join(results)
 
     except Exception as e:
-
         logger.exception("web_search tool failed")
-
         return f"Web Search Error: {str(e)}"
 
 

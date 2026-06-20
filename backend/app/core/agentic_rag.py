@@ -5,7 +5,7 @@ from langchain_core.prompts import PromptTemplate
 from app.agents.tools import search_documents, list_documents, web_search
 from app.utils.query_rewriter import rewrite_query
 from app.utils.agent_extract import extract_agent_answer
-from app.utils.logger import logger, is_main_process
+from app.utils.logger import logger
 from app.models.llm import chat_llm as llm
 
 
@@ -68,16 +68,13 @@ class AgenticRAG:
 
     def __init__(self):
         """Initialize single agentic RAG system with all tools."""
-        if is_main_process():
-            logger.info("Creating unified Agentic RAG system (ReAct)")
-
         # Define tools
         self.tools = [search_documents, list_documents, web_search]
 
         # Create ReAct prompt
         prompt = PromptTemplate.from_template(REACT_PROMPT_TEMPLATE)
 
-        # Create ReAct agent (better for smaller models)
+        # Create ReAct agent
         agent = create_react_agent(
             llm=llm,
             tools=self.tools,
@@ -88,13 +85,10 @@ class AgenticRAG:
         self.agent = AgentExecutor(
             agent=agent,
             tools=self.tools,
-            verbose=True,  # Enable verbose for debugging
-            handle_parsing_errors=True,  # Handle parsing errors gracefully
-            max_iterations=5,  # Limit iterations
+            verbose=True,
+            handle_parsing_errors=True,
+            max_iterations=5,
         )
-
-        if is_main_process():
-            logger.info("Agentic RAG system initialized successfully (ReAct)")
 
     # --------------------------------------------------
     # MAIN RUN METHOD
@@ -106,32 +100,27 @@ class AgenticRAG:
         The agent will autonomously decide which tools to use based on the query.
         """
         trace = []
-        logger.info(f"Processing query: {query}")
 
         # Step 1: Rewrite query if there's chat history context
         if chat_history:
             chat_context = "\n".join(
                 f"{msg['role']}: {msg['content']}"
-                for msg in chat_history[-5:]  # Last 5 messages for context
+                for msg in chat_history[-5:]
             )
             rewritten_query = rewrite_query(question=query, chat_context=chat_context)
             trace.append(f"Query rewritten: {rewritten_query}")
-            logger.info(f"Query rewritten to: {rewritten_query}")
         else:
             rewritten_query = query
-            trace.append("No rewriting needed (no chat history)")
 
         # Step 2: Let the agent handle the query autonomously
         try:
             trace.append("Agent reasoning and selecting tools...")
-            logger.info("Invoking agentic RAG system (ReAct)")
 
             # ReAct agent expects {"input": query} format
             response = self.agent.invoke({"input": rewritten_query})
 
             # Extract the final answer from ReAct agent response
             raw_answer = response.get("output", "No response generated")
-            logger.info("Agent completed successfully")
 
             # Step 3: Parse sources from the response
             sources = self._extract_sources(raw_answer, response)
