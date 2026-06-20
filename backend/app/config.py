@@ -20,6 +20,9 @@ class Settings:
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
     RERANKER_MODEL: str = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base")
 
+    # Document Processing
+    USE_MARKDOWN_EXTRACTION: bool = os.getenv("USE_MARKDOWN_EXTRACTION", "true").lower() == "true"
+
     # Logs
     MAX_LOG_LINES: int = int(os.getenv("MAX_LOG_LINES", "100"))
 

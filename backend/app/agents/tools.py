@@ -14,15 +14,26 @@ from ddgs import DDGS
 @tool
 def search_documents(question: str) -> str:
     """
-    Search all indexed documents.
+    Search all uploaded documents (PDFs, TXT, MD, CSV, JSON, YAML).
 
-    Use this tool whenever the user asks about:
-    - Document content
-    - Summaries
-    - Reports
-    - Contracts
-    - Policies
-    - Uploaded PDFs
+    Use this tool when the user asks about:
+    - Document content, summaries, or specific information in uploaded files
+    - Reports, contracts, policies, manuals, or any uploaded materials
+    - Company-specific internal data or proprietary information
+    - Questions that explicitly reference "my document", "the file", "uploaded PDF", etc.
+    - Historical data that was uploaded by the user
+
+    Examples:
+    - "What does my contract say about termination?"
+    - "Summarize the Q4 report I uploaded"
+    - "What are the key points in my document?"
+
+    Do NOT use for:
+    - Current events, news, or real-time information
+    - Public figures or companies (unless specifically about uploaded documents)
+    - Questions requiring up-to-date web information
+
+    Returns: Answer with source citations (filename and page numbers)
     """
     logger.info(f"Tool search_documents called with question: {question}")
 
@@ -53,7 +64,16 @@ def search_documents(question: str) -> str:
 @tool
 def list_documents() -> str:
     """
-    List all indexed documents.
+    List all documents that have been uploaded and indexed in the system.
+
+    Use this tool when the user asks:
+    - "What documents do I have?"
+    - "Which files are available?"
+    - "Show me my uploaded documents"
+    - "List all indexed files"
+    - "What can I search in my documents?"
+
+    Returns: List of all indexed document filenames
     """
     logger.info("Tool list_documents called")
 
@@ -83,15 +103,28 @@ def list_documents() -> str:
 @tool
 def web_search(query: str) -> str:
     """
-    Search the web for current information.
+    Search the internet for current, real-time, and public information.
 
-    Use for:
-    - Current events
-    - Recent news
-    - Companies
-    - CEOs
-    - Technologies
-    - Public internet information
+    Use this tool when the user asks about:
+    - Current events, breaking news, or recent developments
+    - Public figures (CEOs, founders, politicians, celebrities)
+    - Companies and their current status, stock prices, or recent announcements
+    - Technologies, products, or services and their latest versions
+    - Real-world facts, statistics, or data not likely to be in uploaded documents
+    - Questions requiring up-to-date information (weather, sports scores, etc.)
+    - Verification of information against current public sources
+
+    Examples:
+    - "Who is the current CEO of Apple?"
+    - "What's the latest news about artificial intelligence?"
+    - "What happened in the 2026 Olympics?"
+    - "What is the stock price of Tesla today?"
+
+    Use with document search for comparison queries:
+    - "Compare the CEO in my document with Apple's current CEO" (use search_documents first, then web_search)
+    - "Is the information in my document still accurate?" (search docs, then verify with web)
+
+    Returns: Search results with titles, content snippets, and URLs
     """
 
     logger.info(f"Tool web_search called with query: {query}")
