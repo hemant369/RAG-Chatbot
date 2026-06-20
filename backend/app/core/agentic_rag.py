@@ -1,6 +1,7 @@
 from textwrap import dedent
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.prompts import PromptTemplate
+from langchain_classic.agents import AgentExecutor
+from langchain_classic.agents import create_react_agent
+from langchain_core.prompts import PromptTemplate
 from app.agents.tools import search_documents, list_documents, web_search
 from app.utils.query_rewriter import rewrite_query
 from app.utils.agent_extract import extract_agent_answer
