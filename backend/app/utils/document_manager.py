@@ -47,8 +47,9 @@ class DocumentManager:
                 "File may be scanned/image-based or corrupted."
             )
 
-        for doc in documents:
+        for i, doc in enumerate(documents):
             doc.metadata["file_hash"] = file_hash
+            doc.metadata["page_number"] = i + 1
 
         logger.info(f"Loaded {len(documents)} document(s) from {file_path}")
         return documents

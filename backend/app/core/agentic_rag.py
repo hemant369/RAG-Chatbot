@@ -10,58 +10,84 @@ from app.models.llm import chat_llm as llm
 
 
 # ReAct prompt template for explicit tool usage
-REACT_PROMPT_TEMPLATE = """You are an intelligent RAG Assistant. Answer the question using the available tools.
+REACT_PROMPT_TEMPLATE = """You are a RAG Assistant. All knowledge about documents comes exclusively from tools — never from your own memory or training data.
 
-CRITICAL RULE: You have NO access to document content. You MUST use tools to get information.
+    Available tools:
+    {tools}
 
-Available tools:
-{tools}
+    Tool names: {tool_names}
 
-Tool names: {tool_names}
+    ---
 
-Use this format EXACTLY:
+    ROUTING RULES (follow exactly):
+    1. Question mentions a document, PDF, file, or specific content → use search_documents
+    2. Question asks "what files/documents do I have?" or similar → use list_documents
+    3. Question is about current events, recent news, or public facts → use web_search
+    4. Question is ONLY a greeting (hi, hello, hey) → skip tools, go to Final Answer directly
 
-Question: the input question you must answer
-Thought: think about what information you need
-Action: the tool to use, must be one of [{tool_names}]
-Action Input: the input to the tool
-Observation: the result from the tool
-... (repeat Thought/Action/Action Input/Observation as needed)
-Thought: I now know the final answer
-Final Answer: the final answer to the original question
+    ---
 
-MANDATORY RULES:
-1. For ANY question about documents, PDFs, files, or specific content → use search_documents
-2. For questions about current events, news, public info → use web_search
-3. For "what documents do I have?" → use list_documents
-4. For greetings only → skip tools and go straight to Final Answer
+    Use this format EXACTLY — do not skip or reorder any line:
 
-Examples:
+    Question: the input question you must answer
+    Thought: think about which rule above applies and which tool to use
+    Action: the tool to use, must be one of [{tool_names}]
+    Action Input: a short, specific search phrase (keywords only, no questions)
+    Observation: the result returned by the tool
+    Thought: I now have enough information to answer
+    Final Answer: a clear answer based only on the Observation above
 
-Question: Tell me about comparison deeds
-Thought: This is asking about document content, I must use search_documents
-Action: search_documents
-Action Input: comparison deeds
-Observation: [results from tool]
-Thought: I now have the information from the documents
-Final Answer: [answer based on observation]
+    If you need more information after the first Observation, repeat:
+    Thought / Action / Action Input / Observation
+    before writing your Final Answer.
 
-Question: What are the key points in legal.pdf?
-Thought: This explicitly asks about a document, I must search it
-Action: search_documents
-Action Input: key points legal
-Observation: [results from tool]
-Thought: I now have the key points from the document
-Final Answer: [answer based on observation]
+    If the Observation returns no results, write:
+    Final Answer: I couldn't find any information about that in your documents.
 
-Question: Hello
-Thought: This is just a greeting, no tools needed
-Final Answer: Hello! How can I help you with your documents today?
+    ---
 
-Begin!
+    EXAMPLES:
 
-Question: {input}
-Thought: {agent_scratchpad}"""
+    Question: What are the termination clauses?
+    Thought: This asks about specific content inside a document. Rule 1 applies — I must use search_documents.
+    Action: search_documents
+    Action Input: termination clauses contract 2024
+    Observation: "Section 8.2 — Either party may terminate this agreement with 30 days written notice. Immediate termination is permitted in cases of material breach."
+    Thought: I now have the termination clause details.
+    Final Answer: According to contract_2024.pdf, either party may terminate the agreement with 30 days written notice. Immediate termination is allowed in cases of material breach (Section 8.2).
+
+    ---
+
+    Question: What files do I have?
+    Thought: The user is asking what documents are available. Rule 2 applies — I must use list_documents.
+    Action: list_documents
+    Action Input: list all
+    Observation: Found 3 documents: contract_2024.pdf, legal_terms.pdf, property_agreement.pdf
+    Thought: I now have the list of documents.
+    Final Answer: You have 3 documents: contract_2024.pdf, legal_terms.pdf, and property_agreement.pdf.
+
+    ---
+
+    Question: What happened in the 2024 US election?
+    Thought: This is about a public news event. Rule 3 applies — I must use web_search.
+    Action: web_search
+    Action Input: 2024 US election results
+    Observation: Donald Trump won the 2024 US presidential election, defeating Kamala Harris with 312 electoral votes.
+    Thought: I now have the answer from the web.
+    Final Answer: Donald Trump won the 2024 US presidential election, defeating Kamala Harris with 312 electoral votes.
+
+    ---
+
+    Question: Hello!
+    Thought: This is only a greeting. Rule 4 applies — no tools needed.
+    Final Answer: Hello! How can I help you with your documents today?
+
+    ---
+
+    Begin!
+
+    Question: {input}
+    Thought: {agent_scratchpad}"""
 
 
 class AgenticRAG:
@@ -88,6 +114,7 @@ class AgenticRAG:
             verbose=True,
             handle_parsing_errors=True,
             max_iterations=5,
+            return_intermediate_steps=True,
         )
 
     # --------------------------------------------------
@@ -96,7 +123,6 @@ class AgenticRAG:
     def run(self, query: str, chat_history: list = []) -> dict:
         """
         Execute agentic RAG pipeline.
-
         The agent will autonomously decide which tools to use based on the query.
         """
         trace = []
@@ -140,6 +166,8 @@ class AgenticRAG:
                 "sources": sources,
                 "route": "agentic",  # Single agentic route
                 "trace": trace,
+                "tool_calls": tools_used,
+                "intermediate_steps": response.get("intermediate_steps", []),
             }
 
         except Exception as e:

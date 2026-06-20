@@ -58,7 +58,7 @@ def create_index(documents):
     return index
 
 
-def _build_query_engine(top_k: int = 10) -> RetrieverQueryEngine:
+def _build_query_engine(top_k: int = 5) -> RetrieverQueryEngine:
     logger.info(f"Building query engine with top_k={top_k}")
 
     index = VectorStoreIndex.from_vector_store(

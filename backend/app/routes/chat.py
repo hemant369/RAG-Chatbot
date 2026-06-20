@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.chat import ChatRequest, ChatResponse, AgentReasoning
+from app.schemas.chat import ChatRequest, ChatResponse, AgentReasoning, ToolCall
 from app.utils.logger import setup_logger
 from app.core.agentic_rag import AgenticRAG
 
@@ -22,10 +22,20 @@ async def chat_message(request: ChatRequest):
             query=request.query,
             chat_history=history,
         )
+        # Map LangChain's intermediate_steps → ToolCall models
+        tool_calls = []
+        for action, observation in result.get("intermediate_steps", []):
+            tool_calls.append(ToolCall(
+                name=action.tool,
+                input=action.tool_input if isinstance(action.tool_input, str)
+                      else str(action.tool_input),
+                output=str(observation),
+            ))
+
 
         reasoning = AgentReasoning(
             thought="\n".join(result.get("trace", [])),
-            tool_calls=[],
+            tool_calls=tool_calls,
             final_answer=result["final_answer"],
         )
 
