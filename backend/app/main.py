@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 from app.routes import chat, documents, logs
-from app.utils.logger import setup_logger
+from app.utils.logger import setup_logger, is_main_process
 from app.config import settings
 
 load_dotenv()
@@ -43,7 +43,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
-logger.info(f"CORS configured for origins: {settings.ALLOWED_ORIGINS}")
+
+if is_main_process():
+    logger.info(f"CORS configured for origins: {settings.ALLOWED_ORIGINS}")
 
 app.include_router(chat)
 app.include_router(documents)
@@ -66,6 +68,10 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+
+    # Set environment variable to detect main process
+    os.environ["FASTAPI_MAIN_PROCESS"] = "1"
+
     uvicorn.run(
         "app.main:app",
         host="127.0.0.1",

@@ -2,7 +2,7 @@ from llama_index.llms.ollama import Ollama
 from langchain_ollama import ChatOllama
 
 from app.config import settings
-from app.utils.logger import logger
+from app.utils.logger import logger, is_main_process
 
 # LlamaIndex LLM (for query engine)
 llm = Ollama(
@@ -18,4 +18,5 @@ chat_llm = ChatOllama(
     request_timeout=settings.LLM_TIMEOUT,
 )
 
-logger.info(f"LLM models initialized: {settings.LLM_MODEL}")
+if is_main_process():
+    logger.info(f"LLM models initialized: {settings.LLM_MODEL}")

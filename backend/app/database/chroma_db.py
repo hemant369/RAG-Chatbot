@@ -5,16 +5,19 @@ import chromadb
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core import StorageContext
 
-from app.utils.logger import logger
+from app.utils.logger import logger, is_main_process
 
 load_dotenv()
 
 chroma_path = os.getenv("CHROMA_DB_PATH", "../db/chroma_db")
-logger.info(f"Initializing ChromaDB persistent client at {chroma_path}")
+if is_main_process():
+    logger.info(f"Initializing ChromaDB persistent client at {chroma_path}")
+
 db = chromadb.PersistentClient(path=chroma_path)
 
 chroma_collection = db.get_or_create_collection("documents")
-logger.info("ChromaDB collection initialized: documents")
+if is_main_process():
+    logger.info("ChromaDB collection initialized: documents")
 
 vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 

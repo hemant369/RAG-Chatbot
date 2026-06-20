@@ -1,109 +1,99 @@
 from textwrap import dedent
-from langchain.agents import create_agent
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain.prompts import PromptTemplate
 from app.agents.tools import search_documents, list_documents, web_search
 from app.utils.query_rewriter import rewrite_query
 from app.utils.agent_extract import extract_agent_answer
-from app.utils.logger import logger
+from app.utils.logger import logger, is_main_process
 from app.models.llm import chat_llm as llm
 
 
-# Comprehensive system prompt for single agentic RAG system
-AGENTIC_RAG_SYSTEM_PROMPT = dedent("""
-    You are an intelligent Agentic RAG Assistant with access to tools.
+# ReAct prompt template for explicit tool usage
+REACT_PROMPT_TEMPLATE = """You are an intelligent RAG Assistant. Answer the question using the available tools.
 
-    ## CRITICAL: You Have NO Knowledge of User Documents
+CRITICAL RULE: You have NO access to document content. You MUST use tools to get information.
 
-    You do NOT have access to any document content in your knowledge base.
-    You MUST use the search_documents tool for ANY question about documents.
-    NEVER guess or make assumptions about document content.
+Available tools:
+{tools}
 
-    ## Available Tools:
+Tool names: {tool_names}
 
-    1. **search_documents** - Search uploaded documents (PDFs, contracts, reports)
-    2. **list_documents** - List all available documents
-    3. **web_search** - Search the internet for current information
+Use this format EXACTLY:
 
-    ## MANDATORY Tool Usage Rules:
+Question: the input question you must answer
+Thought: think about what information you need
+Action: the tool to use, must be one of [{tool_names}]
+Action Input: the input to the tool
+Observation: the result from the tool
+... (repeat Thought/Action/Action Input/Observation as needed)
+Thought: I now know the final answer
+Final Answer: the final answer to the original question
 
-    ### ALWAYS use search_documents for these queries:
-    - ANY question about document content ("what does my document say...")
-    - Document summaries ("summarize the report...")
-    - Specific information from files ("tell me about X in the document...")
-    - Questions mentioning: "document", "PDF", "file", "uploaded", "contract", "report"
-    - Questions about specific topics that could be in documents ("comparison deeds", "legal terms", etc.)
+MANDATORY RULES:
+1. For ANY question about documents, PDFs, files, or specific content → use search_documents
+2. For questions about current events, news, public info → use web_search
+3. For "what documents do I have?" → use list_documents
+4. For greetings only → skip tools and go straight to Final Answer
 
-    ### ALWAYS use web_search for these queries:
-    - Current events and news ("what happened today...")
-    - Public figures ("who is the CEO of...")
-    - Real-time information ("latest news about...")
-    - Public company/technology information
+Examples:
 
-    ### Use BOTH tools in sequence for:
-    - Comparison queries ("compare document info with current data...")
-    - Verification queries ("is my document info still accurate...")
+Question: Tell me about comparison deeds
+Thought: This is asking about document content, I must use search_documents
+Action: search_documents
+Action Input: comparison deeds
+Observation: [results from tool]
+Thought: I now have the information from the documents
+Final Answer: [answer based on observation]
 
-    ### Respond directly (no tools) ONLY for:
-    - Greetings: "hello", "hi", "how are you"
-    - General chat: "thank you", "goodbye"
+Question: What are the key points in legal.pdf?
+Thought: This explicitly asks about a document, I must search it
+Action: search_documents
+Action Input: key points legal
+Observation: [results from tool]
+Thought: I now have the key points from the document
+Final Answer: [answer based on observation]
 
-    ## Step-by-Step Process:
+Question: Hello
+Thought: This is just a greeting, no tools needed
+Final Answer: Hello! How can I help you with your documents today?
 
-    1. **Analyze the query**: Does it mention documents, files, or specific content?
-    2. **If YES**: IMMEDIATELY use search_documents tool - do NOT respond directly
-    3. **If NO**: Check if it needs web info or is just chitchat
-    4. **Wait for tool results**: Never answer before calling the appropriate tool
-    5. **Synthesize response**: Use the tool's output to formulate your answer
+Begin!
 
-    ## Examples:
-
-    User: "Tell me about comparison deeds"
-    → Think: This could be in a document
-    → Action: Call search_documents("comparison deeds")
-    → Wait for results, then respond
-
-    User: "What are the key points in legal.pdf?"
-    → Think: Explicitly asking about a document
-    → Action: Call search_documents("key points legal")
-    → Wait for results, then respond
-
-    User: "Who is the CEO of Microsoft?"
-    → Think: Public information, not document-related
-    → Action: Call web_search("CEO Microsoft")
-    → Wait for results, then respond
-
-    User: "Hello"
-    → Think: Greeting, no tools needed
-    → Action: Respond directly with friendly greeting
-
-    ## Error Handling:
-
-    If search_documents returns no results:
-    - Do NOT say "please upload the document"
-    - Instead say: "I couldn't find information about [topic] in the indexed documents. The document may not contain this information, or it may not be indexed yet."
-
-    ## Remember:
-
-    - You have ZERO knowledge of document content
-    - ALWAYS use search_documents for document questions
-    - NEVER make up document information
-    - Tool results are your ONLY source of document information
-""").strip()
+Question: {input}
+Thought: {agent_scratchpad}"""
 
 
 class AgenticRAG:
 
     def __init__(self):
         """Initialize single agentic RAG system with all tools."""
-        logger.info("Creating unified Agentic RAG system")
+        if is_main_process():
+            logger.info("Creating unified Agentic RAG system (ReAct)")
 
-        # Create single agent with all tools
-        self.agent = create_agent(
-            model=llm,
-            tools=[search_documents, list_documents, web_search],
-            system_prompt=AGENTIC_RAG_SYSTEM_PROMPT,
+        # Define tools
+        self.tools = [search_documents, list_documents, web_search]
+
+        # Create ReAct prompt
+        prompt = PromptTemplate.from_template(REACT_PROMPT_TEMPLATE)
+
+        # Create ReAct agent (better for smaller models)
+        agent = create_react_agent(
+            llm=llm,
+            tools=self.tools,
+            prompt=prompt,
         )
 
-        logger.info("Agentic RAG system initialized successfully")
+        # Create agent executor
+        self.agent = AgentExecutor(
+            agent=agent,
+            tools=self.tools,
+            verbose=True,  # Enable verbose for debugging
+            handle_parsing_errors=True,  # Handle parsing errors gracefully
+            max_iterations=5,  # Limit iterations
+        )
+
+        if is_main_process():
+            logger.info("Agentic RAG system initialized successfully (ReAct)")
 
     # --------------------------------------------------
     # MAIN RUN METHOD
@@ -133,14 +123,13 @@ class AgenticRAG:
         # Step 2: Let the agent handle the query autonomously
         try:
             trace.append("Agent reasoning and selecting tools...")
-            logger.info("Invoking agentic RAG system")
+            logger.info("Invoking agentic RAG system (ReAct)")
 
-            response = self.agent.invoke(
-                {"messages": [{"role": "user", "content": rewritten_query}]}
-            )
+            # ReAct agent expects {"input": query} format
+            response = self.agent.invoke({"input": rewritten_query})
 
-            # Extract the final answer
-            raw_answer = extract_agent_answer(response)
+            # Extract the final answer from ReAct agent response
+            raw_answer = response.get("output", "No response generated")
             logger.info("Agent completed successfully")
 
             # Step 3: Parse sources from the response
@@ -215,12 +204,13 @@ class AgenticRAG:
         """Detect which tools were used from agent response."""
         tools_used = []
 
-        # Check response messages for tool calls
-        messages = response.get("messages", [])
-        for msg in messages:
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tool_call in msg.tool_calls:
-                    tool_name = tool_call.get("name", "")
+        # Check for intermediate steps in ReAct agent response
+        intermediate_steps = response.get("intermediate_steps", [])
+        for step in intermediate_steps:
+            if len(step) >= 1:
+                action = step[0]
+                if hasattr(action, "tool"):
+                    tool_name = action.tool
                     if tool_name and tool_name not in tools_used:
                         tools_used.append(tool_name)
 
